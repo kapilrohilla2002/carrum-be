@@ -42,6 +42,6 @@ import JwtService from "./services/jwt.service";
         RolesService,
         PermissionService
     ],
-    exports: [UserService, IdentityService]
+    exports: [UserService, IdentityService, JwtService]
 })
 export class AuthModule { }

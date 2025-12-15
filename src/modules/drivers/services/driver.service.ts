@@ -1,9 +1,16 @@
-import { Injectable } from "@nestjs/common"
+import { Injectable, HttpException, HttpStatus } from "@nestjs/common"
 import { DriverRepository } from "../repositories/driver.repository";
 import { ROLES } from "src/constants/constants";
+import { Types } from "mongoose";
+import { UtilService } from "src/utils/util.service";
 
 type CreateDriverParams = {
     userId: string;
+    hubId: string;
+    createdBy: string;
+    fileUploadId: string;
+    schemeId?: string;
+    parentDriverId?: string;
 }
 
 type GetHubManagerDriverListParams = {
@@ -36,16 +43,38 @@ type GetDriverManagerDriverListParams = {
 
 @Injectable()
 export class DriverService {
-    constructor(private readonly driverRepository: DriverRepository) { }
+    constructor(
+        private readonly driverRepository: DriverRepository,
+        private readonly utilService: UtilService
+    ) { }
 
-    async createDriver({ userId }: CreateDriverParams) {
+    async createDriver({ userId, hubId, createdBy, fileUploadId, schemeId, parentDriverId }: CreateDriverParams) {
+        // Check if driver already exists for this user
+        const existingDriver = await this.driverRepository.getDriverByUserId(userId);
+        if (existingDriver) {
+            throw new HttpException("Driver already exists for this user", HttpStatus.CONFLICT);
+        }
 
-        return {}
+        // Generate carrumId
+        const carrumId = await this.utilService.generateCarrumId();
+
+        // Create driver
+        const driver = await this.driverRepository.createDriver({
+            userId: new Types.ObjectId(userId),
+            hubId: new Types.ObjectId(hubId),
+            createdBy: new Types.ObjectId(createdBy),
+            fileUploadId: new Types.ObjectId(fileUploadId),
+            carrumId: carrumId,
+            status: 'LEAD',
+            schemeId: schemeId ? new Types.ObjectId(schemeId) : undefined,
+            parentDriverId: parentDriverId ? new Types.ObjectId(parentDriverId) : undefined,
+        } as any);
+
+        return driver;
     }
 
     async createNewCarrumId(): Promise<string> {
-
-        return ""
+        return this.utilService.generateCarrumId();
     }
 
     async getDriverListByRole(role: string, hubId: string): Promise<any[]> {
@@ -110,15 +139,29 @@ export class DriverService {
 
 
     async getDrivers(): Promise<any[]> {
-        return []
+        return this.driverRepository.getDrivers();
     }
 
     async getDriverById(id: string): Promise<any> {
-        return {}
+        if (!Types.ObjectId.isValid(id)) {
+            throw new HttpException("Invalid driver ID", HttpStatus.BAD_REQUEST);
+        }
+        const driver = await this.driverRepository.getDriverById(id);
+        if (!driver) {
+            throw new HttpException("Driver not found", HttpStatus.NOT_FOUND);
+        }
+        return driver;
     }
 
     async updateDriver(id: string, driver: any): Promise<any> {
-        return {}
+        if (!Types.ObjectId.isValid(id)) {
+            throw new HttpException("Invalid driver ID", HttpStatus.BAD_REQUEST);
+        }
+        const existingDriver = await this.driverRepository.getDriverById(id);
+        if (!existingDriver) {
+            throw new HttpException("Driver not found", HttpStatus.NOT_FOUND);
+        }
+        return this.driverRepository.updateDriver(id, driver);
     }
 
     async deleteDriver(id: string): Promise<any> {

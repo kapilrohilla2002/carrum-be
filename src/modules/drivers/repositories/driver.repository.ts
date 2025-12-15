@@ -20,8 +20,13 @@ export class DriverRepository {
         return data;
     }
 
-    async updateDriver(id: string, driver: Driver): Promise<Driver | null> {
-        const data = await this.driverModel.findByIdAndUpdate(id, driver).lean()
+    async getDriverByUserId(userId: string): Promise<Driver | null> {
+        const data = await this.driverModel.findOne({ userId: userId }).lean()
+        return data;
+    }
+
+    async updateDriver(id: string, driver: Partial<Driver>): Promise<Driver | null> {
+        const data = await this.driverModel.findByIdAndUpdate(id, driver, { new: true }).lean()
         return data;
     }
 
